@@ -1,14 +1,3 @@
-#include <arpa/inet.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <iostream>
-#include <fstream>
-#include <chrono>
-#include <iomanip>
-
 #include "helper.h"
 
 using namespace std;
@@ -58,7 +47,7 @@ int main(int argc, char **argv) {
     logfile << "Using server address " << ipaddr << endl;
     logfile << "Host " << host << endl;
 
-    double now;
+    double time;
     int transacNum = 0;
     // main loop
     string cmd;
@@ -69,15 +58,14 @@ int main(int argc, char **argv) {
             logfile << "Sleep " << n << " units" << endl;
             Sleep(n);
         } else {
-            now = chrono::duration_cast<std::chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
-            logfile << fixed << setprecision(2) << now / 1000 << ": Send (T" << setw(3) << n << ")" << endl;
+            time = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+            logfile << fixed << setprecision(2) << time / 1000 << ": Send (T" << setw(3) << n << ")" << endl;
             cmd += " " + host;
-            cmd[cmd.size()] = '\0';
             send(sock, cmd.c_str(), cmd.size(), 0);
             transacNum += 1;
             valread = read(sock, buffer, 1024);
-            now = chrono::duration_cast<std::chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
-            logfile << now / 1000 << ": Recv (D" << setw(3) << string(buffer).substr(1) << ")" << endl;
+            time = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+            logfile << time / 1000 << ": Recv (D" << setw(3) << string(buffer).substr(1) << ")" << endl;
         }
     }
 

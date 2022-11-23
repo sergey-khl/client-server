@@ -1,0 +1,23 @@
+.TH CLIENT 1 "23 November 23"
+
+.SH NAME
+client \- client for Tands funcs
+.SH SYNOPSIS
+\fBclient\fP \fIport\fP \fIip-addresss\fP
+.SH DESCRIPTION
+\fBclient\fP starts a client which connects with
+\fIport\fP to server on \fIip-addresss\fP.
+Then T<n> with int n>0 can execute a transaction
+and S<n> with int n between 0 and 100 to sleep.
+Information is stored in hostname.pid log file.
+.SH FILES
+.TP
+\fC./hostname.pid\fR
+the client log file for a particular hostname
+and clients pid.
+.SH "SEE ALSO"
+server(1)
+.SH BUGS
+No error catching for incorrect commands
+or if client called with incorrect arguments
+then client crashes.

@@ -1,16 +1,5 @@
 #include <netinet/in.h>
-#include <arpa/inet.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <iostream>
-#include <sys/socket.h>
 #include <sys/time.h>
-#include <fstream>
-#include <chrono>
-#include <iomanip>
 #include <map>
 #include <cstring>
 
@@ -155,7 +144,7 @@ int main(int argc, char **argv) {
                     memset(buffer, 0, sizeof buffer);
                     logfile << fixed << setprecision(2) << time / 1000 << ": #" << setw(3) << transactions["total"] << " (T" << setw(3) << n << ") from " << host << endl;
                     Trans(n);
-                    time = chrono::duration_cast<std::chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+                    time = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
                     logfile << time / 1000 << ": #" << setw(3) << transactions["total"] << " (Done) from " << host << endl;
                     string done = "D" + to_string(transactions["total"]);
                     send(client_sockets[i], done.c_str(), done.length(), 0);
