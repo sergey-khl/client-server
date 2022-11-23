@@ -5,6 +5,9 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <iostream>
+#include <fstream>
+#include <chrono>
+#include <iomanip>
 
 #include "helper.h"
 
@@ -14,10 +17,10 @@ int main(int argc, char **argv) {
     //https://www.geeksforgeeks.org/socket-programming-cc/
     int sock = 0, valread, client_fd;
     struct sockaddr_in serv_addr;
-    string hello = "Hello from client";
     char buffer[1024] = { 0 };
 
     if (argc != 3) {
+        cout << "incorrect number of calling arguments" << endl;
         exit(0);
     }
     int port = stoi(argv[1]);
@@ -44,17 +47,44 @@ int main(int argc, char **argv) {
         return -1;
     }
 
+    ofstream logfile;
+
+    char hostname[128];
+    gethostname(hostname, 128);
+    string host = string(hostname) + "." + to_string(getpid());
+    logfile.open(host);
+    
+    logfile << "Using port " << port << endl;
+    logfile << "Using server address " << ipaddr << endl;
+    logfile << "Host " << host << endl;
+
+    double now;
+    int transacNum = 0;
     // main loop
     string cmd;
     while (getline(cin, cmd)) {
+        // https://www.epochconverter.com/
+        int n = stoi(cmd.substr(1));
         if (cmd[0] == 'S') {
-            Sleep(stoi(cmd.substr(1)));
+            logfile << "Sleep " << n << " units" << endl;
+            Sleep(n);
         } else {
+            now = chrono::duration_cast<std::chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+            logfile << fixed << setprecision(2) << now / 1000 << ": Send (T" << setw(3) << n << ")" << endl;
+            cmd += " " + host;
+            cmd[cmd.size()] = '\0';
             send(sock, cmd.c_str(), cmd.size(), 0);
+            transacNum += 1;
             valread = read(sock, buffer, 1024);
-            printf("%s\n", buffer);
+            now = chrono::duration_cast<std::chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+            logfile << now / 1000 << ": Recv (D" << setw(3) << string(buffer).substr(1) << ")" << endl;
         }
     }
+
+    logfile << "Sent " << transacNum << " transactions" << endl;
+
+    // close logfile
+    logfile.close();
 
     // closing the connected socket
     close(client_fd);

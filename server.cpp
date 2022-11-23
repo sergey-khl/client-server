@@ -8,6 +8,11 @@
 #include <iostream>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <fstream>
+#include <chrono>
+#include <iomanip>
+#include <map>
+#include <cstring>
 
 #include "helper.h"
 
@@ -19,8 +24,8 @@ int main(int argc, char **argv) {
     int server_fd, new_socket, valread, client_sockets[clients], max_sd, activity;
     struct sockaddr_in address;
     fd_set readfds;
+    timeval timeout;
     int opt = 1;
-    char buffer[1024] = { 0 };
     
     if (argc != 2) {
         cout << "incorrect number of calling arguments" << endl;
@@ -64,12 +69,22 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    int transactionNum = 1;
+    ofstream logfile;
+
+    logfile.open("Server");
+    
+    logfile << "Using port " << port << endl;
+
+    double startTime = 0, time;
+    map<string, int> transactions;
+    transactions["total"] = 0;
     // main loop
     while (1) {
         FD_ZERO(&readfds);
         FD_SET(server_fd, &readfds);
         max_sd = server_fd;
+        timeout.tv_sec = 30;
+        timeout.tv_usec = 0;
 
         //add child sockets to set 
         for (int i = 0 ; i < clients ; i++) {  
@@ -85,13 +100,12 @@ int main(int argc, char **argv) {
         }  
 
         // wait for client socket io or timeout
-        activity = select( max_sd + 1 , &readfds , NULL , NULL , NULL);  
+        activity = select( max_sd + 1 , &readfds , NULL , NULL , &timeout);  
 
         if ((activity < 0) && (errno!=EINTR)) {  
             printf("select error");  
         } 
         if (activity == 0) {
-            printf("timed out... exiting");
             break;
         }
 
@@ -101,9 +115,7 @@ int main(int argc, char **argv) {
                 perror("accept");  
                 exit(EXIT_FAILURE);  
             }
-            //inform user of socket number - used in send and receive commands 
-            printf("New connection , socket fd is %d , ip is : %s , port : %d \n" , new_socket , inet_ntoa(address.sin_addr) , ntohs(address.sin_port));  
-           
+
             //add new socket to array of sockets 
             for (int i = 0; i < clients; i++) {  
                 //if position is empty 
@@ -112,8 +124,9 @@ int main(int argc, char **argv) {
                     break;  
                 }  
             }  
-        }  
+        }
 
+        char buffer[1024];
         for (int i = 0; i < clients; i++)  
         {  
             if (FD_ISSET(client_sockets[i], &readfds)) {  
@@ -124,15 +137,41 @@ int main(int argc, char **argv) {
                     client_sockets[i] = 0;  
                 }  
                 else {
-                    printf("%s\n", buffer);
-                    Trans(stoi(string(buffer).substr(1)));
-                    string done = "D" + to_string(transactionNum);
-                    transactionNum += 1;
+                    time = chrono::duration_cast<std::chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+                    // first transaction
+                    if (startTime == 0) {
+                        startTime = time;
+                    }
+                    transactions["total"] += 1;
+                    string inp = string(buffer);
+                    string cmd = inp.substr(0, inp.find(" "));
+                    int n = stoi(cmd.substr(1));
+                    string host = inp.substr(inp.find(" ") + 1);
+                    if (transactions.find(host) == transactions.end()) {
+                        transactions[host] = 1;
+                    } else {
+                        transactions[host] += 1;
+                    }
+                    memset(buffer, 0, sizeof buffer);
+                    logfile << fixed << setprecision(2) << time / 1000 << ": #" << setw(3) << transactions["total"] << " (T" << setw(3) << n << ") from " << host << endl;
+                    Trans(n);
+                    time = chrono::duration_cast<std::chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+                    logfile << time / 1000 << ": #" << setw(3) << transactions["total"] << " (Done) from " << host << endl;
+                    string done = "D" + to_string(transactions["total"]);
                     send(client_sockets[i], done.c_str(), done.length(), 0);
                 }  
             }  
         }
     }
+    double endTime = chrono::duration_cast<std::chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+    logfile << "\nSUMMARY" << endl;
+    for (auto const& trans: transactions) {
+        if (trans.first != "total") {
+            logfile << "\t" << trans.second << " transactions from " << trans.first << endl;
+        }
+    }
+    
+    logfile << transactions["total"]/((endTime - startTime)/1000 - 30) << " transactions/sec (" << transactions["total"] << "/" << (endTime - startTime)/1000 - 30 << ")" << endl;
     
     // closing the connected socket
     for (int i = 0; i < clients; i++) {  
