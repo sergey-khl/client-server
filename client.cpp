@@ -54,9 +54,11 @@ int main(int argc, char **argv) {
     while (getline(cin, cmd)) {
         // https://www.epochconverter.com/
         int n = stoi(cmd.substr(1));
+        // if command is a sleep
         if (cmd[0] == 'S') {
             logfile << "Sleep " << n << " units" << endl;
             Sleep(n);
+        // otherwise command is a Trans request
         } else {
             time = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
             logfile << fixed << setprecision(2) << time / 1000 << ": Send (T" << setw(3) << n << ")" << endl;

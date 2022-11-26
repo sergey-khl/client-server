@@ -10,7 +10,7 @@ using namespace std;
 int main(int argc, char **argv) {
     //https://www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/
     int clients = 100;
-    int server_fd, new_socket, valread, client_sockets[clients], max_sd, activity;
+    int server_fd, new_socket, valread, client_sockets[clients], max_sd, num_fds;
     struct sockaddr_in address;
     fd_set readfds;
     timeval timeout;
@@ -69,32 +69,33 @@ int main(int argc, char **argv) {
     transactions["total"] = 0;
     // main loop
     while (1) {
+        // on each iter we need to zero out readfds and set it to sockets
         FD_ZERO(&readfds);
-        FD_SET(server_fd, &readfds);
-        max_sd = server_fd;
+        // reset timeout on each iter since select may reset it
         timeout.tv_sec = 30;
         timeout.tv_usec = 0;
 
-        //add child sockets to set 
+        // set server socket
+        FD_SET(server_fd, &readfds);
+        max_sd = server_fd;
+        //add all client sockets to readfds set
         for (int i = 0 ; i < clients ; i++) {  
-            //if valid socket descriptor then add to read list 
-            if(client_sockets[i] > 0) {
-                FD_SET(client_sockets[i], &readfds);  
-            }
-
-            //highest file descriptor number, need it for the select function 
-            if(client_sockets[i] > max_sd){
-                max_sd = client_sockets[i]; 
-            }
+            if (client_sockets[i] > 0) {
+                FD_SET(client_sockets[i], &readfds);
+                // get max for select. we can do inside this if cond since
+                // max_fd is > 0
+                if (client_sockets[i] > max_sd) {
+                    max_sd = client_sockets[i];
+                }
+            }            
         }  
 
         // wait for client socket io or timeout
-        activity = select( max_sd + 1 , &readfds , NULL , NULL , &timeout);  
-
-        if ((activity < 0) && (errno!=EINTR)) {  
-            printf("select error");  
-        } 
-        if (activity == 0) {
+        if ((num_fds = select( max_sd + 1 , &readfds , NULL , NULL , &timeout)) < 0) {
+            perror("select");
+            break;
+        } else if (num_fds == 0) {
+            // we timed out
             break;
         }
 
@@ -115,17 +116,18 @@ int main(int argc, char **argv) {
             }  
         }
 
+        // otherwise we got some info from a client and can now process it
+
         char buffer[1024];
-        for (int i = 0; i < clients; i++)  
-        {  
+        // loop through clients in read list
+        for (int i = 0; i < clients; i++) {  
             if (FD_ISSET(client_sockets[i], &readfds)) {  
-                // if client closes then we can reuse socket
+                // if ^c then remove socket for reuse
                 if ((valread = read( client_sockets[i] , buffer, 1024)) == 0) {  
-                    //Close the socket and mark as 0 in list for reuse 
                     close( client_sockets[i] );  
-                    client_sockets[i] = 0;  
-                }  
-                else {
+                    client_sockets[i] = 0;
+                // we read something
+                } else {
                     time = chrono::duration_cast<std::chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
                     // first transaction
                     if (startTime == 0) {
